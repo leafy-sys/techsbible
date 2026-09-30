@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TechsBible</title>
+  <!-- Load HTMX via CDN -->
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <!-- Simple dark mode styling -->
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0f172a; color: #f8fafc; padding: 2rem; }
+    button { background: #0284c7; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.375rem; cursor: pointer; }
+    button:hover { background: #0369a1; }
+    .card { background: #1e293b; padding: 1rem; border-radius: 0.5rem; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>TechsBible Reference Hub</h1>
+  <p>Under active development.</p>
+
+  <!-- Interactive HTMX Example -->
+  <div class="card">
+    <button hx-get="/api/ping" hx-target="#ping-result">
+      Ping Backend
+    </button>
+    <div id="ping-result" style="margin-top: 0.5rem; color: #38bdf8;"></div>
+  </div>
+</body>
+</html>
