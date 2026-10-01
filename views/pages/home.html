@@ -1,0 +1,20 @@
+{{define "title"}}Home - TechsBible{{end}}
+
+{{define "content"}}
+  <h1>Technical Reference Hub</h1>
+  <p style="color: var(--text-muted);">Select a reference topic from the sidebar or search below.</p>
+
+  <div class="card">
+    <h3>Instant Search</h3>
+    <input 
+      type="text" 
+      name="q" 
+      placeholder="Type to filter references..." 
+      style="width: 100%; padding: 0.75rem; background: #0f172a; border: 1px solid var(--border); color: white; border-radius: 0.375rem;"
+      hx-get="/api/search" 
+      hx-trigger="keyup changed delay:200ms" 
+      hx-target="#search-results"
+    >
+    <div id="search-results" style="margin-top: 1rem;"></div>
+  </div>
+{{end}}

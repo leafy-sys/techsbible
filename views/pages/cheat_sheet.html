@@ -1,0 +1,18 @@
+{{define "title"}}Linux CLI - TechsBible{{end}}
+
+{{define "content"}}
+  <h1>Linux Core Commands</h1>
+  <p style="color: var(--text-muted);">Essential shell commands for system administration and daily use.</p>
+
+  <div class="card">
+    <h3>Disk Usage Analysis</h3>
+    <p>Check human-readable disk space breakdown across mounts:</p>
+    <code>df -h</code>
+  </div>
+
+  <div class="card">
+    <h3>Process Management</h3>
+    <p>View processes sorted by memory usage:</p>
+    <code>ps aux --sort=-%mem | head -n 10</code>
+  </div>
+{{end}}

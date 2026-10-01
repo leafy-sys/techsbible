@@ -1,0 +1,87 @@
+:root {
+  --bg-main: #0f172a;
+  --bg-card: #1e293b;
+  --border: #334155;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --accent: #38bdf8;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+header {
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 2rem;
+  background-color: #020617;
+}
+
+header a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 1.25rem;
+}
+
+.layout {
+  display: flex;
+  flex: 1;
+}
+
+sidebar {
+  width: 260px;
+  border-right: 1px solid var(--border);
+  padding: 1.5rem;
+  background-color: #020617;
+}
+
+sidebar ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+sidebar li {
+  margin-bottom: 0.75rem;
+}
+
+sidebar a {
+  color: var(--text-muted);
+  text-decoration: none;
+  display: block;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.25rem;
+}
+
+sidebar a:hover, sidebar a.active {
+  color: var(--accent);
+  background-color: var(--bg-card);
+}
+
+main {
+  flex: 1;
+  padding: 2rem;
+}
+
+.card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin-top: 1rem;
+}
+
+code {
+  background-color: #0f172a;
+  color: #38bdf8;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.25rem;
+  font-family: monospace;
+}
