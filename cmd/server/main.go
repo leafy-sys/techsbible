@@ -1,16 +1,36 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"net/http"
+	"os"
 	"path/filepath"
-	"strings"
+
+	"github.com/yuin/goldmark"
 )
 
-// Helper to render full pages or HTMX content fragments
+type PageData struct {
+	Content template.HTML
+}
+
+func parseMarkdownFile(filename string) (template.HTML, error) {
+	path := filepath.Join("content", filename)
+	mdData, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	var buf bytes.Buffer
+	if err := goldmark.Convert(mdData, &buf); err != nil {
+		return "", err
+	}
+
+	return template.HTML(buf.String()), nil
+}
+
 func renderTemplate(w http.ResponseWriter, r *http.Request, pageFile string, data interface{}) {
-	// If the request comes from HTMX, render ONLY the content block
 	if r.Header.Get("HX-Request") == "true" {
 		tmpl, err := template.ParseFiles(filepath.Join("views", "pages", pageFile))
 		if err != nil {
@@ -21,7 +41,6 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, pageFile string, dat
 		return
 	}
 
-	// Otherwise, render the full page with base layout
 	files := []string{
 		filepath.Join("views", "layouts", "base.html"),
 		filepath.Join("views", "pages", pageFile),
@@ -37,27 +56,29 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, pageFile string, dat
 func main() {
 	mux := http.NewServeMux()
 
-	// 1. Static File Server (CSS, JS, Images)
+	// Static assets
 	fs := http.FileServer(http.Dir("static"))
 	mux.Handle("GET /static/", http.StripPrefix("/static/", fs))
 
-	// 2. Page Routes
+	// Home page
 	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
 		renderTemplate(w, r, "home.html", nil)
 	})
 
-	mux.HandleFunc("GET /ref/linux", func(w http.ResponseWriter, r *http.Request) {
-		renderTemplate(w, r, "cheat_sheet.html", nil)
-	})
+	// Dynamic Markdown Route: match any /ref/{slug} request
+	mux.HandleFunc("GET /ref/{slug}", func(w http.ResponseWriter, r *http.Request) {
+		slug := r.PathValue("slug") // Extract path variable (e.g., "linux" or "networking")
+		mdFileName := fmt.Sprintf("%s.md", slug)
 
-	// 3. Search Endpoint (HTMX)
-	mux.HandleFunc("GET /api/search", func(w http.ResponseWriter, r *http.Request) {
-		query := strings.TrimSpace(r.URL.Query().Get("q"))
-		if query == "" {
-			fmt.Fprint(w, "")
+		htmlContent, err := parseMarkdownFile(mdFileName)
+		if err != nil {
+			// Return a 404 if the requested markdown file doesn't exist
+			http.NotFound(w, r)
 			return
 		}
-		fmt.Fprintf(w, `<div style="color: var(--accent);">Filtering results for: <strong>%s</strong></div>`, template.HTMLEscapeString(query))
+
+		data := PageData{Content: htmlContent}
+		renderTemplate(w, r, "doc.html", data)
 	})
 
 	fmt.Println("Server running on http://127.0.0.1:8080")
