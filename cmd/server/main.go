@@ -7,13 +7,59 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/parser"
 )
 
+var (
+	// Matches [[Target Page|Display Text]]
+	wikiLinkAliasRegex = regexp.MustCompile(`\[\[([^\]\|]+)\|([^\]]+)\]\]`)
+	// Matches [[Target Page]]
+	wikiLinkSimpleRegex = regexp.MustCompile(`\[\[([^\]]+)\]\]`)
+	// Matches Obsidian Callouts like > [!info]- Title
+	calloutRegex = regexp.MustCompile(`(?m)^>\s*\[!(\w+)\][-+]?\s*(.*)`)
+)
+
+func preprocessObsidianMarkdown(md []byte) []byte {
+	// 1. Convert [[Target Page|Display Text]] -> [Display Text](/ref/target_page)
+	md = wikiLinkAliasRegex.ReplaceAllFunc(md, func(match []byte) []byte {
+		sub := wikiLinkAliasRegex.FindSubmatch(match)
+		target := strings.ToLower(strings.ReplaceAll(string(sub[1]), " ", "_"))
+		display := string(sub[2])
+		return []byte(fmt.Sprintf("[%s](/ref/%s)", display, target))
+	})
+
+	// 2. Convert [[Target Page]] -> [Target Page](/ref/target_page)
+	md = wikiLinkSimpleRegex.ReplaceAllFunc(md, func(match []byte) []byte {
+		sub := wikiLinkSimpleRegex.FindSubmatch(match)
+		target := strings.ToLower(strings.ReplaceAll(string(sub[1]), " ", "_"))
+		display := string(sub[1])
+		return []byte(fmt.Sprintf("[%s](/ref/%s)", display, target))
+	})
+
+	// 3. Convert Obsidian callouts > [!info] -> Standard Blockquotes with bold titles
+	md = calloutRegex.ReplaceAll(md, []byte("> **${1}:**${2}"))
+
+	return md
+}
+
+// 1. Defined PageData struct to fix compiler error
 type PageData struct {
 	Content template.HTML
 }
+
+var mdParser = goldmark.New(
+	goldmark.WithExtensions(
+		extension.GFM, // Enables Markdown tables
+	),
+	goldmark.WithParserOptions(
+		parser.WithAutoHeadingID(),
+	),
+)
 
 func parseMarkdownFile(filename string) (template.HTML, error) {
 	path := filepath.Join("content", filename)
@@ -22,8 +68,11 @@ func parseMarkdownFile(filename string) (template.HTML, error) {
 		return "", err
 	}
 
+	// Preprocess Obsidian / Wikilink syntax
+	cleanMdData := preprocessObsidianMarkdown(mdData)
+
 	var buf bytes.Buffer
-	if err := goldmark.Convert(mdData, &buf); err != nil {
+	if err := mdParser.Convert(cleanMdData, &buf); err != nil {
 		return "", err
 	}
 
@@ -60,14 +109,14 @@ func main() {
 	fs := http.FileServer(http.Dir("static"))
 	mux.Handle("GET /static/", http.StripPrefix("/static/", fs))
 
-	// Home page
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+	// Home page - added /{$} so it strictly matches the root domain
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		renderTemplate(w, r, "home.html", nil)
 	})
 
 	// Dynamic Markdown Route: match any /ref/{slug} request
 	mux.HandleFunc("GET /ref/{slug}", func(w http.ResponseWriter, r *http.Request) {
-		slug := r.PathValue("slug") // Extract path variable (e.g., "linux" or "networking")
+		slug := r.PathValue("slug") // Extract path variable
 		mdFileName := fmt.Sprintf("%s.md", slug)
 
 		htmlContent, err := parseMarkdownFile(mdFileName)

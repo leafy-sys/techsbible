@@ -8,7 +8,6 @@ date: 10-30-2025
 ---
 # [Linux](https://en.wikipedia.org/wiki/Linux)
 
-![Linux|150](https://upload.wikimedia.org/wikipedia/commons/3/35/Tux.svg)
 
 *Imported from [Wikipedia](https://en.wikipedia.org/)*
 
@@ -52,7 +51,7 @@ Linux also runs on [[Embedded system|embedded systems]], i.e., devices whose ope
 
 ### Precursors
 
-![Linus Torvalds|190](https://upload.wikimedia.org/wikipedia/commons/5/5c/Linus_Torvalds_%28cropped%29.jpg?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail_unscaled)
+![Linus Torvalds|250](https://upload.wikimedia.org/wikipedia/commons/5/5c/Linus_Torvalds_%28cropped%29.jpg?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail_unscaled)
 *[[Linus Torvalds]], principal author of the Linux kernel*
 
 The [[Unix]] operating system was conceived of and implemented in 1969, at [[AT&T Corporation|AT&T]]'s [[Bell Labs]] in the United States, by [[Ken Thompson]], [[Dennis Ritchie]], [[Douglas McIlroy]], and [[Joe Ossanna]].[^51] First released in 1971, Unix was written entirely in [[Assembly language]], as was common practice at the time. In 1973, in a key pioneering approach, it was rewritten in the [[C (programming language)|C]] programming language by Dennis Ritchie (except for some hardware and I/O routines). The availability of a [[High-level language]] implementation of Unix made its [[Porting]] to different computer platforms easier.[^52]
