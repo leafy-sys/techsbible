@@ -1,4 +1,4 @@
-# Doom Emacs Cheetsheet
+# Doom Emacs Cheatsheet
 
 ## 1. Navigation & Movement (Normal Mode)
 
