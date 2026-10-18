@@ -13,7 +13,12 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+    "github.com/jackc/pgx/v5/pgxpool"
 )
+
+type App struct {
+    db *pgxpool.Pool
+}
 
 var (
 	// Matches [[Target Page|Display Text]]
@@ -103,6 +108,7 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, pageFile string, dat
 }
 
 func main() {
+    ctx := context.Background()
 	mux := http.NewServeMux()
 
 	// Static assets
@@ -134,4 +140,7 @@ func main() {
 	if err := http.ListenAndServe(":8080", mux); err != nil {
 		panic(err)
 	}
+
+    app := &App{db: pool}
+    _ = app
 }
