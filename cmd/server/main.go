@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"context"
+	"log"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
@@ -109,6 +111,26 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, pageFile string, dat
 
 func main() {
     ctx := context.Background()
+
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL := "" {
+		log.Fatal("DATABASE_URL is not set")
+	}
+
+	pool, err := pgxpool.New(ctx, dbURL)
+	if err != nil {
+		log.Fatalf("unable to create pool: %v", err)
+	}
+	defer pool.Close()
+
+	if err := pool.Ping(ctx); err != nil {
+		log.Fatalf("unable to reach database: %v, err")
+	}
+	fmt.Println("connected to db")
+
+	app := &App{db: pool}
+	_ = app
+
 	mux := http.NewServeMux()
 
 	// Static assets
@@ -140,7 +162,4 @@ func main() {
 	if err := http.ListenAndServe(":8080", mux); err != nil {
 		panic(err)
 	}
-
-    app := &App{db: pool}
-    _ = app
 }
