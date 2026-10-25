@@ -11,11 +11,19 @@ import (
 	"strings"
 	"context"
 	"log"
+    "errors"
+    "crypto/rand"
+    "crypto/sha256"
+    "encoding/base64"
+    "time"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+    "github.com/jackc/pgx/v5"
     "github.com/jackc/pgx/v5/pgxpool"
+    "github.com/jackc/pgx/v5/pgconn"
+    "golang.org/x/crypto/bcrypt"
 )
 
 type App struct {
@@ -52,6 +60,37 @@ func preprocessObsidianMarkdown(md []byte) []byte {
 	md = calloutRegex.ReplaceAll(md, []byte("> **${1}:**${2}"))
 
 	return md
+}
+
+func hashToken(token string) []byte {
+    sum := sha256.Sum256([]byte(token))
+    return sum[:]
+}
+
+func (a *App) currentUser(r *http.Request) (int, bool) {
+    c, err := r.Cookie("session")
+    if err != nil {
+        return 0, false
+    }
+    var userID int
+    err = a.db.QueryRow(r.Context(),
+        `SELECT user_id FROM sessions WHERE token_hash = $1 AND expires_at > NOW()`,
+        hashToken(c.Value)).Scan(&userID)
+    if err != nil {
+        return 0, false
+    }
+    return userID, true
+}
+
+type SignupData struct {
+    Error string
+    Email string
+    Username string
+}
+
+type LoginData struct {
+    Error string
+    Email string
 }
 
 // 1. Defined PageData struct to fix compiler error
@@ -109,11 +148,129 @@ func renderTemplate(w http.ResponseWriter, r *http.Request, pageFile string, dat
 	tmpl.ExecuteTemplate(w, "base.html", data)
 }
 
+func (a *App) signupPage(w http.ResponseWriter, r *http.Request) {
+    renderTemplate(w, r, "signup.html", SignupData{})
+}
+
+func (a *App) signupSubmit(w http.ResponseWriter, r *http.Request) {
+    email := strings.TrimSpace(r.FormValue("email"))
+    username := strings.TrimSpace(r.FormValue("username"))
+    password := r.FormValue("password")
+
+    fail := func(msg string) {
+        renderTemplate(w, r, "signup.html", SignupData{Error: msg, Email: email, Username: username})
+    }
+    if len(password) < 8 || len(password) > 72 {
+        fail("Password must be 8 to 72 characters.")
+        return
+    }
+
+    hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+    if err != nil {
+        http.Error(w, "something went wrong", http.StatusInternalServerError)
+        return
+    }
+
+    _, err = a.db.Exec(r.Context(),
+        `INSERT INTO users (email, username, password_hash) VALUES ($1, $2, $3)`,
+        email, username, string(hash))
+    if err != nil {
+        var pgErr *pgconn.PgError
+        if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+            fail("That email or username is already taken.")
+            return
+        }
+        log.Printf("signup insert: %v", err)
+        http.Error(w, "something went wrong", http.StatusInternalServerError)
+        return
+    }
+
+    http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+func (a *App) loginPage(w http.ResponseWriter, r *http.Request) {
+    renderTemplate(w, r, "login.html", LoginData{})
+}
+
+func (a *App) loginSubmit(w http.ResponseWriter, r *http.Request) {
+    email := strings.TrimSpace(r.FormValue("email"))
+    password := r.FormValue("password")
+
+    fail := func() {
+        renderTemplate(w, r, "login.html", LoginData{
+            Error: "Invalid email or password.",
+            Email: email,
+        })
+    }
+
+    var userID int
+    var hash string
+    err := a.db.QueryRow(r.Context(),
+        `SELECT user_id, password_hash FROM users WHERE email = $1`,
+        email).Scan(&userID, &hash)
+    if err != nil {
+        if errors.Is(err, pgx.ErrNoRows) {
+            fail()
+            return
+        }
+        log.Printf("login lookup: %v", err)
+        http.Error(w, "something went wrong", http.StatusInternalServerError)
+        return
+    }
+
+    if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
+        fail()
+        return
+    }
+
+    token, err := newSessionToken()
+    if err != nil {
+        log.Printf("session token: %v", err)
+        http.Error(w, "something went wrong", http.StatusInternalServerError)
+        return
+    }
+    expires := time.Now().Add(7 * 24 * time.Hour)
+
+    _, err = a.db.Exec(r.Context(),
+        `INSERT INTO sessions (token_hash, user_id, expires_at) VALUES ($1, $2, $3)`,
+        hashToken(token), userID, expires)
+    if err != nil {
+        log.Printf("session insert: %v", err)
+        http.Error(w, "something wnet wrong", http.StatusInternalServerError)
+        return
+    }
+
+    http.SetCookie(w, &http.Cookie{
+        Name: "session",
+        Value: token,
+        Path: "/",
+        Expires: expires,
+        HttpOnly: true,
+        SameSite: http.SameSiteLaxMode,
+        Secure: true,
+    })
+
+    http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func handToken(token string) []byte {
+    sum := sha256.Sum256([]byte(token))
+    return sum[:]
+}
+
+func newSessionToken() (string, error) {
+    b := make([]byte, 32)
+    if _, err := rand.Read(b); err != nil {
+        return "", err
+    }
+    return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
 func main() {
     ctx := context.Background()
 
 	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL := "" {
+	if dbURL == "" {
 		log.Fatal("DATABASE_URL is not set")
 	}
 
@@ -157,6 +314,12 @@ func main() {
 		data := PageData{Content: htmlContent}
 		renderTemplate(w, r, "doc.html", data)
 	})
+
+    mux.HandleFunc("GET /signup", app.signupPage)
+    mux.HandleFunc("POST /signup", app.signupSubmit)
+
+    mux.HandleFunc("GET /login", app.loginPage)
+    mux.HandleFunc("POST /login", app.loginSubmit)
 
 	fmt.Println("Server running on http://127.0.0.1:8080")
 	if err := http.ListenAndServe(":8080", mux); err != nil {
